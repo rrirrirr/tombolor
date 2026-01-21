@@ -1,65 +1,542 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useCallback, useRef } from "react";
+
+interface Slip {
+  id: string;
+  text: string;
+  drawn: boolean;
+}
+
+interface TombolaState {
+  slips: Slip[];
+  drawnSlip: Slip | null;
+}
+
+export default function TombolaPage() {
+  const [tombola1, setTombola1] = useState<TombolaState>({
+    slips: [],
+    drawnSlip: null,
+  });
+  const [tombola2, setTombola2] = useState<TombolaState>({
+    slips: [],
+    drawnSlip: null,
+  });
+  const [input1, setInput1] = useState("");
+  const [input2, setInput2] = useState("");
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawKey, setDrawKey] = useState(0);
+  const [ejectingSlips, setEjectingSlips] = useState<{
+    slip1: Slip | null;
+    slip2: Slip | null;
+  }>({ slip1: null, slip2: null });
+
+  const drum1Ref = useRef<HTMLDivElement>(null);
+  const drum2Ref = useRef<HTMLDivElement>(null);
+
+  const addSlip = useCallback(
+    (tombolaNum: 1 | 2) => {
+      const input = tombolaNum === 1 ? input1 : input2;
+      const setTombola = tombolaNum === 1 ? setTombola1 : setTombola2;
+      const setInput = tombolaNum === 1 ? setInput1 : setInput2;
+
+      if (!input.trim()) return;
+
+      const newSlip: Slip = {
+        id: crypto.randomUUID(),
+        text: input.trim(),
+        drawn: false,
+      };
+
+      setTombola((prev) => ({
+        ...prev,
+        slips: [...prev.slips, newSlip],
+      }));
+      setInput("");
+    },
+    [input1, input2]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, tombolaNum: 1 | 2) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addSlip(tombolaNum);
+      }
+    },
+    [addSlip]
+  );
+
+  const removeSlip = useCallback((tombolaNum: 1 | 2, slipId: string) => {
+    const setTombola = tombolaNum === 1 ? setTombola1 : setTombola2;
+    setTombola((prev) => ({
+      ...prev,
+      slips: prev.slips.filter((s) => s.id !== slipId),
+    }));
+  }, []);
+
+  const getRemainingSlips = (tombola: TombolaState) =>
+    tombola.slips.filter((s) => !s.drawn);
+
+  const canDraw =
+    getRemainingSlips(tombola1).length > 0 ||
+    getRemainingSlips(tombola2).length > 0;
+
+  const drawSlips = useCallback(() => {
+    if (isDrawing || !canDraw) return;
+
+    setIsDrawing(true);
+
+    // Add spinning class
+    drum1Ref.current?.classList.add("drum-spinning");
+    drum2Ref.current?.classList.add("drum-spinning");
+
+    // Determine what will be drawn
+    const remaining1 = getRemainingSlips(tombola1);
+    const remaining2 = getRemainingSlips(tombola2);
+
+    let drawn1: Slip | null = null;
+    let drawn2: Slip | null = null;
+
+    if (remaining1.length > 0) {
+      const randomIndex = Math.floor(Math.random() * remaining1.length);
+      drawn1 = remaining1[randomIndex];
+    }
+
+    if (remaining2.length > 0) {
+      const randomIndex = Math.floor(Math.random() * remaining2.length);
+      drawn2 = remaining2[randomIndex];
+    }
+
+    // After spin animation, show ejecting slips
+    setTimeout(() => {
+      setEjectingSlips({ slip1: drawn1, slip2: drawn2 });
+
+      // After eject animation, update state and show results
+      setTimeout(() => {
+        setEjectingSlips({ slip1: null, slip2: null });
+        setDrawKey((k) => k + 1);
+
+        if (drawn1) {
+          setTombola1((prev) => ({
+            ...prev,
+            slips: prev.slips.map((s) =>
+              s.id === drawn1!.id ? { ...s, drawn: true } : s
+            ),
+            drawnSlip: drawn1,
+          }));
+        }
+
+        if (drawn2) {
+          setTombola2((prev) => ({
+            ...prev,
+            slips: prev.slips.map((s) =>
+              s.id === drawn2!.id ? { ...s, drawn: true } : s
+            ),
+            drawnSlip: drawn2,
+          }));
+        }
+
+        drum1Ref.current?.classList.remove("drum-spinning");
+        drum2Ref.current?.classList.remove("drum-spinning");
+        setIsDrawing(false);
+      }, 800);
+    }, 1500);
+  }, [isDrawing, canDraw, tombola1, tombola2]);
+
+  const resetAll = useCallback(() => {
+    setTombola1({ slips: [], drawnSlip: null });
+    setTombola2({ slips: [], drawnSlip: null });
+    setInput1("");
+    setInput2("");
+    setDrawKey(0);
+  }, []);
+
+  const resetDrawn = useCallback(() => {
+    setTombola1((prev) => ({
+      slips: prev.slips.map((s) => ({ ...s, drawn: false })),
+      drawnSlip: null,
+    }));
+    setTombola2((prev) => ({
+      slips: prev.slips.map((s) => ({ ...s, drawn: false })),
+      drawnSlip: null,
+    }));
+    setDrawKey(0);
+  }, []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-screen py-8 px-4 sm:py-12 sm:px-6">
+      {/* Header */}
+      <header className="text-center mb-12 sm:mb-16 flourish">
+        <h1
+          className="text-5xl sm:text-7xl font-black tracking-tight mb-3"
+          style={{
+            fontFamily: "var(--font-display), Georgia, serif",
+            color: "var(--burgundy)",
+            textShadow:
+              "3px 3px 0 var(--gold), 5px 5px 10px rgba(44, 24, 16, 0.2)",
+          }}
+        >
+          TOMBOLA
+        </h1>
+        <p
+          className="text-xl sm:text-2xl italic"
+          style={{ color: "var(--burgundy-dark)" }}
+        >
+          Snurra trumman &mdash; pröva lyckan
+        </p>
+      </header>
+
+      {/* Main content */}
+      <div className="max-w-7xl mx-auto">
+        {/* Tombolas grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 mb-12">
+          {/* Tombola 1 */}
+          <TombolaDrum
+            title="Tombola I"
+            tombola={tombola1}
+            input={input1}
+            setInput={setInput1}
+            onAddSlip={() => addSlip(1)}
+            onRemoveSlip={(id) => removeSlip(1, id)}
+            onKeyDown={(e) => handleKeyDown(e, 1)}
+            drumRef={drum1Ref}
+            ejectingSlip={ejectingSlips.slip1}
+          />
+
+          {/* Tombola 2 */}
+          <TombolaDrum
+            title="Tombola II"
+            tombola={tombola2}
+            input={input2}
+            setInput={setInput2}
+            onAddSlip={() => addSlip(2)}
+            onRemoveSlip={(id) => removeSlip(2, id)}
+            onKeyDown={(e) => handleKeyDown(e, 2)}
+            drumRef={drum2Ref}
+            ejectingSlip={ejectingSlips.slip2}
+          />
+        </div>
+
+        {/* Draw button */}
+        <div className="text-center mb-12">
+          <button
+            onClick={drawSlips}
+            disabled={!canDraw || isDrawing}
+            className="golden-button px-16 py-5 text-2xl sm:text-4xl font-black rounded-xl uppercase tracking-widest"
+            style={{
+              fontFamily: "var(--font-display), Georgia, serif",
+              color: canDraw ? "var(--burgundy-dark)" : "#666",
+            }}
+          >
+            {isDrawing ? "Snurrar..." : "Dra Lott!"}
+          </button>
+
+          {!canDraw && tombola1.slips.length + tombola2.slips.length > 0 && (
+            <p
+              className="mt-6 text-xl italic"
+              style={{ color: "var(--burgundy)" }}
+            >
+              Alla lotter har dragits!
+            </p>
+          )}
+        </div>
+
+        {/* Results display */}
+        {(tombola1.drawnSlip || tombola2.drawnSlip) && (
+          <div
+            key={drawKey}
+            className="result-container rounded-xl p-8 sm:p-12 mb-10"
+          >
+            <h2
+              className="text-3xl sm:text-4xl font-bold text-center mb-8"
+              style={{
+                fontFamily: "var(--font-display), Georgia, serif",
+                color: "var(--burgundy)",
+              }}
+            >
+              Vinnande Lotter
+            </h2>
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-8 sm:gap-16">
+              {tombola1.drawnSlip && (
+                <DrawnSlipDisplay
+                  label="Tombola I"
+                  slip={tombola1.drawnSlip}
+                />
+              )}
+              {tombola1.drawnSlip && tombola2.drawnSlip && (
+                <span
+                  className="text-5xl font-black"
+                  style={{
+                    color: "var(--gold)",
+                    textShadow: "2px 2px 4px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  &amp;
+                </span>
+              )}
+              {tombola2.drawnSlip && (
+                <DrawnSlipDisplay
+                  label="Tombola II"
+                  slip={tombola2.drawnSlip}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Control buttons */}
+        <div className="flex flex-wrap justify-center gap-4">
+          <button
+            onClick={resetDrawn}
+            className="px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105"
+            style={{
+              background: "var(--cream-light)",
+              border: "2px solid var(--burgundy)",
+              color: "var(--burgundy)",
+            }}
+          >
+            Återställ Dragningar
+          </button>
+          <button
+            onClick={resetAll}
+            className="px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105"
+            style={{
+              background: "var(--burgundy)",
+              color: "var(--cream)",
+            }}
+          >
+            Rensa Allt
+          </button>
+        </div>
+
+        {/* History of drawn slips */}
+        {(tombola1.slips.some((s) => s.drawn) ||
+          tombola2.slips.some((s) => s.drawn)) && (
+          <div className="mt-10 text-center">
+            <h3
+              className="text-xl font-bold mb-4"
+              style={{
+                fontFamily: "var(--font-display), Georgia, serif",
+                color: "var(--burgundy)",
+              }}
+            >
+              Tidigare Dragna
+            </h3>
+            <div className="flex flex-wrap justify-center gap-2">
+              {tombola1.slips
+                .filter((s) => s.drawn)
+                .map((slip) => (
+                  <span
+                    key={slip.id}
+                    className="px-3 py-1 rounded text-sm"
+                    style={{
+                      background: "rgba(114, 47, 55, 0.1)",
+                      color: "var(--burgundy)",
+                      textDecoration: "line-through",
+                    }}
+                  >
+                    I: {slip.text}
+                  </span>
+                ))}
+              {tombola2.slips
+                .filter((s) => s.drawn)
+                .map((slip) => (
+                  <span
+                    key={slip.id}
+                    className="px-3 py-1 rounded text-sm"
+                    style={{
+                      background: "rgba(201, 162, 39, 0.15)",
+                      color: "var(--burgundy)",
+                      textDecoration: "line-through",
+                    }}
+                  >
+                    II: {slip.text}
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface TombolaDrumProps {
+  title: string;
+  tombola: TombolaState;
+  input: string;
+  setInput: (value: string) => void;
+  onAddSlip: () => void;
+  onRemoveSlip: (id: string) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  drumRef: React.RefObject<HTMLDivElement | null>;
+  ejectingSlip: Slip | null;
+}
+
+function TombolaDrum({
+  title,
+  tombola,
+  input,
+  setInput,
+  onAddSlip,
+  onRemoveSlip,
+  onKeyDown,
+  drumRef,
+  ejectingSlip,
+}: TombolaDrumProps) {
+  const remainingSlips = tombola.slips.filter((s) => !s.drawn);
+
+  return (
+    <div className="flex flex-col items-center">
+      <h2
+        className="text-2xl sm:text-3xl font-bold text-center mb-6"
+        style={{
+          fontFamily: "var(--font-display), Georgia, serif",
+          color: "var(--burgundy)",
+        }}
+      >
+        {title}
+      </h2>
+
+      {/* Input area */}
+      <div className="flex gap-2 mb-6 w-full max-w-sm">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Skriv lottens text..."
+          className="vintage-input flex-1 px-4 py-3 rounded-lg text-lg"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+        <button
+          onClick={onAddSlip}
+          disabled={!input.trim()}
+          className="add-button px-4 py-3 rounded-lg font-bold text-xl"
+          style={{
+            color: input.trim() ? "var(--burgundy-dark)" : "#888",
+          }}
+        >
+          +
+        </button>
+      </div>
+
+      {/* The drum */}
+      <div className="tombola-drum-container w-full max-w-md px-8 pb-10 relative">
+        {/* Ejecting slip animation */}
+        {ejectingSlip && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 z-30 animate-eject">
+            <div
+              className="paper-slip px-4 py-2 rounded text-lg font-bold"
+              style={{ color: "var(--ink)" }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {ejectingSlip.text}
+            </div>
+          </div>
+        )}
+
+        <div ref={drumRef} className="tombola-drum">
+          {/* Metal caps on sides */}
+          <div className="drum-cap-left" />
+          <div className="drum-cap-right" />
+
+          {/* Crank handle */}
+          <div className="drum-handle">
+            <div className="handle-arm">
+              <div className="handle-grip" />
+            </div>
+          </div>
+
+          {/* The cage */}
+          <div className="drum-cage">
+            {/* Interior with slips */}
+            <div className="drum-interior">
+              {remainingSlips.length === 0 ? (
+                <p
+                  className="text-base italic text-center"
+                  style={{ color: "rgba(255,255,255,0.6)" }}
+                >
+                  {tombola.slips.length === 0 ? "Lägg till lotter..." : "Tom!"}
+                </p>
+              ) : (
+                remainingSlips.map((slip, index) => {
+                  const rotation = ((index * 37) % 30) - 15;
+                  return (
+                    <div
+                      key={slip.id}
+                      className="paper-slip px-2 py-1 rounded cursor-pointer group"
+                      style={
+                        {
+                          transform: `rotate(${rotation}deg)`,
+                          "--rot": `${rotation}deg`,
+                        } as React.CSSProperties
+                      }
+                      onClick={() => onRemoveSlip(slip.id)}
+                      title="Klicka för att ta bort"
+                    >
+                      <span
+                        className="text-xs font-medium"
+                        style={{ color: "var(--ink)" }}
+                      >
+                        {slip.text}
+                      </span>
+                      <span className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 text-xs">
+                        ×
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Stand legs */}
+          <div className="drum-stand">
+            <div className="stand-leg" />
+            <div className="stand-leg" />
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      {/* Slip count */}
+      <div
+        className="text-center mt-4 text-base font-semibold"
+        style={{ color: "var(--burgundy)" }}
+      >
+        {remainingSlips.length} av {tombola.slips.length} lotter kvar
+      </div>
+    </div>
+  );
+}
+
+interface DrawnSlipDisplayProps {
+  label: string;
+  slip: Slip;
+}
+
+function DrawnSlipDisplay({ label, slip }: DrawnSlipDisplayProps) {
+  return (
+    <div className="text-center animate-reveal">
+      <p
+        className="text-base font-semibold mb-3 uppercase tracking-wide"
+        style={{ color: "var(--burgundy)" }}
+      >
+        {label}
+      </p>
+      <div
+        className="result-ticket px-10 py-6 rounded-lg animate-float"
+        style={{ minWidth: "140px" }}
+      >
+        <span
+          className="text-3xl sm:text-4xl font-black block"
+          style={{
+            fontFamily: "var(--font-display), Georgia, serif",
+            color: "var(--ink)",
+          }}
+        >
+          {slip.text}
+        </span>
+      </div>
     </div>
   );
 }

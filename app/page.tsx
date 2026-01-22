@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 interface Slip {
   id: string;
@@ -11,6 +11,14 @@ interface Slip {
 interface TombolaState {
   slips: Slip[];
   drawnSlip: Slip | null;
+}
+
+interface ShareableState {
+  t1: string[];
+  t2: string[];
+  n1?: string;
+  n2?: string;
+  draws?: number;
 }
 
 export default function TombolaPage() {
@@ -24,15 +32,76 @@ export default function TombolaPage() {
   });
   const [input1, setInput1] = useState("");
   const [input2, setInput2] = useState("");
+  const [note1, setNote1] = useState("");
+  const [note2, setNote2] = useState("");
+  const [maxDraws, setMaxDraws] = useState<number | null>(null);
+  const [drawCount, setDrawCount] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawKey, setDrawKey] = useState(0);
   const [ejectingSlips, setEjectingSlips] = useState<{
     slip1: Slip | null;
     slip2: Slip | null;
   }>({ slip1: null, slip2: null });
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [isFromLink, setIsFromLink] = useState(false);
 
   const drum1Ref = useRef<HTMLDivElement>(null);
   const drum2Ref = useRef<HTMLDivElement>(null);
+
+  // Parse URL on load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("s");
+    if (encoded) {
+      try {
+        const decoded = JSON.parse(atob(encoded)) as ShareableState;
+        if (decoded.t1?.length) {
+          setTombola1({
+            slips: decoded.t1.map((text) => ({
+              id: crypto.randomUUID(),
+              text,
+              drawn: false,
+            })),
+            drawnSlip: null,
+          });
+        }
+        if (decoded.t2?.length) {
+          setTombola2({
+            slips: decoded.t2.map((text) => ({
+              id: crypto.randomUUID(),
+              text,
+              drawn: false,
+            })),
+            drawnSlip: null,
+          });
+        }
+        if (decoded.n1) setNote1(decoded.n1);
+        if (decoded.n2) setNote2(decoded.n2);
+        if (decoded.draws) setMaxDraws(decoded.draws);
+        setIsFromLink(true);
+        // Clear URL without reload
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch {
+        // Invalid encoded state, ignore
+      }
+    }
+  }, []);
+
+  const generateShareableLink = useCallback(() => {
+    const state: ShareableState = {
+      t1: tombola1.slips.map((s) => s.text),
+      t2: tombola2.slips.map((s) => s.text),
+    };
+    if (note1.trim()) state.n1 = note1.trim();
+    if (note2.trim()) state.n2 = note2.trim();
+    if (maxDraws && maxDraws > 0) state.draws = maxDraws;
+
+    const encoded = btoa(JSON.stringify(state));
+    const url = `${window.location.origin}${window.location.pathname}?s=${encoded}`;
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }, [tombola1.slips, tombola2.slips, note1, note2, maxDraws]);
 
   const addSlip = useCallback(
     (tombolaNum: 1 | 2) => {
@@ -78,9 +147,12 @@ export default function TombolaPage() {
   const getRemainingSlips = (tombola: TombolaState) =>
     tombola.slips.filter((s) => !s.drawn);
 
-  const canDraw =
+  const hasSlipsRemaining =
     getRemainingSlips(tombola1).length > 0 ||
     getRemainingSlips(tombola2).length > 0;
+
+  const drawsRemaining = maxDraws === null ? null : maxDraws - drawCount;
+  const canDraw = hasSlipsRemaining && (drawsRemaining === null || drawsRemaining > 0);
 
   const drawSlips = useCallback(() => {
     if (isDrawing || !canDraw) return;
@@ -116,6 +188,7 @@ export default function TombolaPage() {
       setTimeout(() => {
         setEjectingSlips({ slip1: null, slip2: null });
         setDrawKey((k) => k + 1);
+        setDrawCount((c) => c + 1);
 
         if (drawn1) {
           setTombola1((prev) => ({
@@ -149,7 +222,12 @@ export default function TombolaPage() {
     setTombola2({ slips: [], drawnSlip: null });
     setInput1("");
     setInput2("");
+    setNote1("");
+    setNote2("");
+    setMaxDraws(null);
+    setDrawCount(0);
     setDrawKey(0);
+    setIsFromLink(false);
   }, []);
 
   const resetDrawn = useCallback(() => {
@@ -161,6 +239,7 @@ export default function TombolaPage() {
       slips: prev.slips.map((s) => ({ ...s, drawn: false })),
       drawnSlip: null,
     }));
+    setDrawCount(0);
     setDrawKey(0);
   }, []);
 
@@ -194,6 +273,8 @@ export default function TombolaPage() {
           {/* Tombola 1 */}
           <TombolaDrum
             title="Tombola I"
+            note={note1}
+            setNote={setNote1}
             tombola={tombola1}
             input={input1}
             setInput={setInput1}
@@ -202,11 +283,14 @@ export default function TombolaPage() {
             onKeyDown={(e) => handleKeyDown(e, 1)}
             drumRef={drum1Ref}
             ejectingSlip={ejectingSlips.slip1}
+            isFromLink={isFromLink}
           />
 
           {/* Tombola 2 */}
           <TombolaDrum
             title="Tombola II"
+            note={note2}
+            setNote={setNote2}
             tombola={tombola2}
             input={input2}
             setInput={setInput2}
@@ -215,11 +299,23 @@ export default function TombolaPage() {
             onKeyDown={(e) => handleKeyDown(e, 2)}
             drumRef={drum2Ref}
             ejectingSlip={ejectingSlips.slip2}
+            isFromLink={isFromLink}
           />
         </div>
 
         {/* Draw button */}
         <div className="text-center mb-12">
+          {/* Draw counter */}
+          {maxDraws !== null && (
+            <p
+              className="mb-4 text-lg font-semibold"
+              style={{ color: "var(--burgundy)" }}
+            >
+              Dragning {drawCount + 1} av {maxDraws}
+              {drawsRemaining === 0 && " (alla dragningar gjorda)"}
+            </p>
+          )}
+
           <button
             onClick={drawSlips}
             disabled={!canDraw || isDrawing}
@@ -237,7 +333,7 @@ export default function TombolaPage() {
               className="mt-6 text-xl italic"
               style={{ color: "var(--burgundy)" }}
             >
-              Alla lotter har dragits!
+              {drawsRemaining === 0 ? "Alla dragningar har gjorts!" : "Alla lotter har dragits!"}
             </p>
           )}
         </div>
@@ -357,6 +453,46 @@ export default function TombolaPage() {
             </div>
           </div>
         )}
+
+        {/* Create shareable link section - only show when not loaded from link */}
+        {!isFromLink && (tombola1.slips.length > 0 || tombola2.slips.length > 0) && (
+          <div className="mt-12 p-6 rounded-xl text-center" style={{ background: "var(--cream-light)", border: "2px solid var(--burgundy)" }}>
+            <h3
+              className="text-xl font-bold mb-4"
+              style={{
+                fontFamily: "var(--font-display), Georgia, serif",
+                color: "var(--burgundy)",
+              }}
+            >
+              Dela Tombolan
+            </h3>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+              <label className="flex items-center gap-3" style={{ color: "var(--burgundy-dark)" }}>
+                <span className="font-semibold">Antal dragningar:</span>
+                <input
+                  type="range"
+                  min="1"
+                  max={Math.max(tombola1.slips.length, tombola2.slips.length, 10)}
+                  value={maxDraws ?? Math.max(tombola1.slips.length, tombola2.slips.length, 1)}
+                  onChange={(e) => setMaxDraws(parseInt(e.target.value))}
+                  className="w-32"
+                  style={{ accentColor: "var(--burgundy)" }}
+                />
+                <span className="font-bold w-8">{maxDraws ?? Math.max(tombola1.slips.length, tombola2.slips.length, 1)}</span>
+              </label>
+              <button
+                onClick={generateShareableLink}
+                className="px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105"
+                style={{
+                  background: "var(--burgundy)",
+                  color: "var(--cream)",
+                }}
+              >
+                {linkCopied ? "Länk kopierad!" : "Kopiera länk"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -364,6 +500,8 @@ export default function TombolaPage() {
 
 interface TombolaDrumProps {
   title: string;
+  note: string;
+  setNote: (value: string) => void;
   tombola: TombolaState;
   input: string;
   setInput: (value: string) => void;
@@ -372,10 +510,13 @@ interface TombolaDrumProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   drumRef: React.RefObject<HTMLDivElement | null>;
   ejectingSlip: Slip | null;
+  isFromLink: boolean;
 }
 
 function TombolaDrum({
   title,
+  note,
+  setNote,
   tombola,
   input,
   setInput,
@@ -384,13 +525,14 @@ function TombolaDrum({
   onKeyDown,
   drumRef,
   ejectingSlip,
+  isFromLink,
 }: TombolaDrumProps) {
   const remainingSlips = tombola.slips.filter((s) => !s.drawn);
 
   return (
     <div className="flex flex-col items-center">
       <h2
-        className="text-2xl sm:text-3xl font-bold text-center mb-6"
+        className="text-2xl sm:text-3xl font-bold text-center mb-2"
         style={{
           fontFamily: "var(--font-display), Georgia, serif",
           color: "var(--burgundy)",
@@ -399,27 +541,50 @@ function TombolaDrum({
         {title}
       </h2>
 
-      {/* Input area */}
-      <div className="flex gap-2 mb-6 w-full max-w-sm">
+      {/* Note - editable when not from link, display only when from link */}
+      {isFromLink ? (
+        note && (
+          <p
+            className="text-lg italic text-center mb-4"
+            style={{ color: "var(--burgundy-dark)" }}
+          >
+            {note}
+          </p>
+        )
+      ) : (
         <input
           type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Skriv lottens text..."
-          className="vintage-input flex-1 px-4 py-3 rounded-lg text-lg"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Notering (valfritt)"
+          className="vintage-input px-3 py-1 rounded text-center text-sm mb-4 w-48"
+          style={{ fontStyle: "italic" }}
         />
-        <button
-          onClick={onAddSlip}
-          disabled={!input.trim()}
-          className="add-button px-4 py-3 rounded-lg font-bold text-xl"
-          style={{
-            color: input.trim() ? "var(--burgundy-dark)" : "#888",
-          }}
-        >
-          +
-        </button>
-      </div>
+      )}
+
+      {/* Input area - hidden when loaded from link */}
+      {!isFromLink && (
+        <div className="flex gap-2 mb-6 w-full max-w-sm">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Skriv lottens text..."
+            className="vintage-input flex-1 px-4 py-3 rounded-lg text-lg"
+          />
+          <button
+            onClick={onAddSlip}
+            disabled={!input.trim()}
+            className="add-button px-4 py-3 rounded-lg font-bold text-xl"
+            style={{
+              color: input.trim() ? "var(--burgundy-dark)" : "#888",
+            }}
+          >
+            +
+          </button>
+        </div>
+      )}
 
       {/* The drum */}
       <div className="tombola-drum-container w-full max-w-md px-8 pb-10 relative">

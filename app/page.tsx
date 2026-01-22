@@ -183,7 +183,7 @@ export default function TombolaPage() {
           className="text-xl sm:text-2xl italic"
           style={{ color: "var(--burgundy-dark)" }}
         >
-          Snurra trumman &mdash; pröva lyckan
+          Två trummor &mdash; ett öde
         </p>
       </header>
 

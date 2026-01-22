@@ -20,6 +20,17 @@ export interface ShareableState {
   n2?: string;
   draws?: number;
   title?: string;
+  seed?: number;
+}
+
+// Seeded random number generator (mulberry32)
+function createSeededRandom(seed: number) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
 }
 
 export default function TombolaClient() {
@@ -47,6 +58,7 @@ export default function TombolaClient() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [isFromLink, setIsFromLink] = useState(false);
   const [displayTitle, setDisplayTitle] = useState("");
+  const [seededRandom, setSeededRandom] = useState<(() => number) | null>(null);
 
   const drum1Ref = useRef<HTMLDivElement>(null);
   const drum2Ref = useRef<HTMLDivElement>(null);
@@ -82,6 +94,9 @@ export default function TombolaClient() {
         if (decoded.n2) setNote2(decoded.n2);
         if (decoded.draws) setMaxDraws(decoded.draws);
         if (decoded.title) setDisplayTitle(decoded.title);
+        if (decoded.seed !== undefined) {
+          setSeededRandom(() => createSeededRandom(decoded.seed!));
+        }
         setIsFromLink(true);
       } catch {
         // Invalid encoded state, ignore
@@ -98,6 +113,8 @@ export default function TombolaClient() {
     if (note2.trim()) state.n2 = note2.trim();
     if (maxDraws && maxDraws > 0) state.draws = maxDraws;
     if (linkTitle.trim()) state.title = linkTitle.trim();
+    // Generate a random seed for deterministic draws
+    state.seed = Math.floor(Math.random() * 2147483647);
 
     const encoded = btoa(JSON.stringify(state));
     const url = `${window.location.origin}${window.location.pathname}?s=${encoded}`;
@@ -170,16 +187,19 @@ export default function TombolaClient() {
     const remaining1 = getRemainingSlips(tombola1);
     const remaining2 = getRemainingSlips(tombola2);
 
+    // Use seeded random if available (from shared link), otherwise use Math.random
+    const random = seededRandom || Math.random;
+
     let drawn1: Slip | null = null;
     let drawn2: Slip | null = null;
 
     if (remaining1.length > 0) {
-      const randomIndex = Math.floor(Math.random() * remaining1.length);
+      const randomIndex = Math.floor(random() * remaining1.length);
       drawn1 = remaining1[randomIndex];
     }
 
     if (remaining2.length > 0) {
-      const randomIndex = Math.floor(Math.random() * remaining2.length);
+      const randomIndex = Math.floor(random() * remaining2.length);
       drawn2 = remaining2[randomIndex];
     }
 
@@ -218,7 +238,7 @@ export default function TombolaClient() {
         setIsDrawing(false);
       }, 800);
     }, 1500);
-  }, [isDrawing, canDraw, tombola1, tombola2]);
+  }, [isDrawing, canDraw, tombola1, tombola2, seededRandom]);
 
   const resetAll = useCallback(() => {
     setTombola1({ slips: [], drawnSlip: null });

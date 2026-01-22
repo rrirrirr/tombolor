@@ -663,15 +663,15 @@ function TombolaDrum({
                   return (
                     <div
                       key={slip.id}
-                      className="paper-slip px-2 py-1 rounded cursor-pointer group"
+                      className={`paper-slip px-2 py-1 rounded ${!isFromLink ? "cursor-pointer group" : ""}`}
                       style={
                         {
                           transform: `rotate(${rotation}deg)`,
                           "--rot": `${rotation}deg`,
                         } as React.CSSProperties
                       }
-                      onClick={() => onRemoveSlip(slip.id)}
-                      title="Klicka för att ta bort"
+                      onClick={!isFromLink ? () => onRemoveSlip(slip.id) : undefined}
+                      title={!isFromLink ? "Klicka för att ta bort" : undefined}
                     >
                       <span
                         className="text-xs font-medium"
@@ -679,9 +679,11 @@ function TombolaDrum({
                       >
                         {slip.text}
                       </span>
-                      <span className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 text-xs">
-                        ×
-                      </span>
+                      {!isFromLink && (
+                        <span className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 text-xs">
+                          ×
+                        </span>
+                      )}
                     </div>
                   );
                 })

@@ -15,8 +15,7 @@ const crimson = Crimson_Text({
 });
 
 export const metadata: Metadata = {
-  title: "Tombola | Dra Din Lott",
-  description: "Två tombolor, en dragning - låt ödet bestämma!",
+  metadataBase: new URL("https://tombolor.se"),
 };
 
 export default function RootLayout({

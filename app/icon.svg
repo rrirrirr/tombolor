@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Drum body -->
+  <ellipse cx="16" cy="16" rx="13" ry="10" fill="#4a3728" stroke="#2d1f14" stroke-width="1"/>
+
+  <!-- Drum front face -->
+  <ellipse cx="16" cy="16" rx="11" ry="8" fill="#6b4d38"/>
+
+  <!-- Slot/opening -->
+  <rect x="12" y="11" width="8" height="10" rx="1" fill="#1a1a1a"/>
+
+  <!-- Lottery balls visible through slot -->
+  <circle cx="14" cy="14" r="2.5" fill="#e74c3c"/>
+  <circle cx="18" cy="17" r="2.5" fill="#3498db"/>
+  <circle cx="15" cy="19" r="2" fill="#f1c40f"/>
+
+  <!-- Handle/crank -->
+  <rect x="27" y="14" width="4" height="4" rx="1" fill="#7f8c8d"/>
+  <rect x="25" y="15" width="3" height="2" fill="#95a5a6"/>
+
+  <!-- Drum rim highlights -->
+  <ellipse cx="16" cy="8" rx="11" ry="2" fill="none" stroke="#8b6b52" stroke-width="1"/>
+  <ellipse cx="16" cy="24" rx="11" ry="2" fill="none" stroke="#3d2a1c" stroke-width="1"/>
+</svg>

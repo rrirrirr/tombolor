@@ -408,17 +408,19 @@ export default function TombolaClient() {
 
         {/* Control buttons */}
         <div className="flex flex-wrap justify-center gap-4">
-          <button
-            onClick={resetDrawn}
-            className="px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105"
-            style={{
-              background: "var(--cream-light)",
-              border: "2px solid var(--burgundy)",
-              color: "var(--burgundy)",
-            }}
-          >
-            Återställ Dragningar
-          </button>
+          {!isFromLink && (
+            <button
+              onClick={resetDrawn}
+              className="px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105"
+              style={{
+                background: "var(--cream-light)",
+                border: "2px solid var(--burgundy)",
+                color: "var(--burgundy)",
+              }}
+            >
+              Återställ Dragningar
+            </button>
+          )}
           <button
             onClick={resetAll}
             className="px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105"

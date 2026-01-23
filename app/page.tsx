@@ -17,13 +17,13 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const params = await searchParams;
   const encoded = params.s;
 
-  let title = "Tombola | Dra Din Lott";
-  const description = "Två tombolor - ett öde";
+  let title = "Tombolor | Dra Din Lott";
+  const description = "två trummor - ett öde";
 
   if (encoded) {
     const state = decodeState(encoded);
     if (state?.title) {
-      title = `${state.title} | Tombola`;
+      title = `${state.title} | Tombolor`;
     }
   }
 
@@ -34,13 +34,13 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
       title,
       description,
       url: "https://tombolor.se",
-      siteName: "Tombola",
+      siteName: "Tombolor",
       images: [
         {
           url: "/opengraph.png",
           width: 1200,
           height: 630,
-          alt: "Tombola - Dra din lott",
+          alt: "Tombolor - Dra din lott",
         },
       ],
       locale: "sv_SE",

@@ -281,13 +281,13 @@ export default function TombolaClient() {
               "3px 3px 0 var(--gold), 5px 5px 10px rgba(44, 24, 16, 0.2)",
           }}
         >
-          {displayTitle || "TOMBOLA"}
+          {displayTitle || "TOMBOLOR"}
         </h1>
         <p
           className="text-xl sm:text-2xl italic"
           style={{ color: "var(--burgundy-dark)" }}
         >
-          Två tombolor &mdash; ett öde
+          två trummor &mdash; ett öde
         </p>
       </header>
 
